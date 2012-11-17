@@ -1,6 +1,7 @@
 require 'instagram'
-require 'open-uri'
-require 'openssl'
+# require 'open-uri'
+# require 'openssl'
+require 'kaminari'
 
 class FeedController < ApplicationController 
   
@@ -13,30 +14,43 @@ class FeedController < ApplicationController
   def home
     client = Instagram.client(:access_token => session[:access_token])
     @user = client.user
-    @recent = client.user_recent_media['data']
-    @page = client.user_recent_media['pagination']['next_url']
-    @popular = client.media_popular
-    @location_search = client.location_recent_media(514276)
-    # @resource_url = "https://api.instagram.com/v1/users/#{@user.id}/media/recent?access_token=#{session[:access_token]}"
-    # @response = open(@resource_url, :ssl_verify_mode => OpenSSL::SSL::VERIFY_NONE).read
-    # @get_pagination = JSON.parse(@response)
-    # @get_next_url = @get_pagination["pagination"]["next_url"]
 
-    # u = IUser.new
-    # u.username = client.user.username
-    # u.fullname = client.user.full_name 
-    # if u.new_record?
-    # u.save
+    # logger.debug "Max ID is #{session[:maxid]}."
+    # logger.debug "Min ID is #{session[:minid]}."
+
+    # @recent = Instagram.user_recent_media(@user['id'], {:access_token => session[:access_token], :count => 6})['data']
+
+
+    # if session[:maxid] == ''
+    #   @recent = Instagram.user_recent_media(@user['id'], {:access_token => session[:access_token], :count => 6})['data']
+    # else
+    #   @recent = Instagram.user_recent_media(@user['id'], {:access_token => session[:access_token], :count => 6, :max_id => session[:maxid]})['data']
     # end
+
+    @recent_unpaged = Instagram.user_recent_media(@user['id'], {:access_token => session[:access_token], :count => 60})['data']
+
+    @recent = Kaminari.paginate_array(@recent_unpaged).page(params[:page]).per(5)
+
+    # session[:previousminid] = session[:minid]
+    # session[:previousmaxid] = session[:maxid]
+    # session[:minid] = @recent.first.id.split("_")[0].to_i
+    # session[:maxid] = @recent.last.id.split("_")[0].to_i
   end
 
-  def test
-    # client = Instagram.client(:access_token => session[:access_token])
-    # @user = client.user
-    @resource_url = @page
-    @json = JSON.parse(open(@resource_url, :ssl_verify_mode => OpenSSL::SSL::VERIFY_NONE).read)    
-    # @json = open(@resource_url, :ssl_verify_mode => OpenSSL::SSL::VERIFY_NONE).read    
-    @recent = @json['data']
+
+  def back
+    client = Instagram.client(:access_token => session[:access_token])
+    @user = client.user
+    #if @maxid is blank
+    @recent = Instagram.user_recent_media(@user['id'], {:access_token => session[:access_token], :count => 6, :min_id => session[:minid], :max_id => session[:previousminid]})['data']
+    # @recent = Instagram.user_recent_media(@user['id'], {:access_token => session[:access_token], :count => 6, :max_id => session[:maxid], :min_id => session[:minid]})['data']
+
+    #Grabs the id of the bottom-most picture from the set of 60 and converts it to an integer.  We use this value
+    #to call the next 60 photos that have an id less than or equaled to the @maxid value.
+    # session[:previousminid] = session[:minid]
+    # session[:previousmaxid] = session[:maxid]
+    # session[:minid] = @recent.first.id.split("_")[0].to_i
+    # session[:maxid] = @recent.last.id.split("_")[0].to_i
   end
 
   def show
